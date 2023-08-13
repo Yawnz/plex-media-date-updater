@@ -10,12 +10,40 @@ namespace PlexDateAddedUpdater.Updater
 {
     public class PlexUpdater
     {
+        public PlexUpdater() 
+        {
+            this.dbPath = RegistryHelper.GetPlexDataFolderPath();
+        }
+
         public PlexUpdater(string dbPath) 
         {
             this.dbPath = dbPath;
         }
 
         string dbPath = string.Empty;
+
+        public async Task UpdateAllLibrariesAsyc()
+        {
+            PlexClient plexClient = new PlexClient(dbPath);
+
+            var libraryFolders = await plexClient.GetLibraryLocationsAsync();
+
+            if (!libraryFolders?.Any() ?? false)
+            {
+                Console.WriteLine("No library folders detected... Please specify a library folder manually.");
+                return;
+            }
+            int totalFolders = libraryFolders.Count();
+            int folderCount = 0;
+
+            Console.WriteLine($"Found {totalFolders} to process.");
+            foreach (var libraryFolder in libraryFolders)
+            {
+                folderCount++;
+                Console.Write($"\rProcessing folder {folderCount} of {totalFolders}: {libraryFolder}");
+                await UpdateDateAddedFromPathAsync(libraryFolder);
+            }
+        }
 
         public async Task UpdateDateAddedFromPathAsync(string filePath)
         {
@@ -55,12 +83,12 @@ namespace PlexDateAddedUpdater.Updater
             {
                 fileCount++;
                 Console.Write($"\rProcessing File {fileCount} of {totalFiles}: {file}");
-                var mediaIds = await plexClient.GetMediaItemIdAsync(file);
+                var mediaIds = await plexClient.GetMediaItemIdsAsync(file);
 
                 foreach (var mediaId in mediaIds)
                 {
                     if (string.IsNullOrWhiteSpace(mediaId)) continue;
-                    var metaDataIds = await plexClient.GetMetaDataItemIdAsync(mediaId);
+                    var metaDataIds = await plexClient.GetMetaDataItemIdsAsync(mediaId);
 
                     foreach (var metaDataId in metaDataIds)
                     {

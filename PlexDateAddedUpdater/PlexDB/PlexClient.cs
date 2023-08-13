@@ -35,37 +35,76 @@ namespace PlexDateAddedUpdater.PlexDB
 
         SqliteConnection sqlConn;
 
-        public async Task<List<string>> GetMediaItemIdAsync(string fileName)
+        public async Task<List<string>> GetLibraryLocationsAsync()
         {
-            List<string> returnIds = new List<string>();
-            var sqlCmd = await CreateCommandAsync($"SELECT media_item_id FROM media_parts WHERE file LIKE \"{fileName}\"");
-            var sqlReader = await sqlCmd.ExecuteReaderAsync();
+            List<string> returnPaths = new List<string>();
 
-            while (sqlReader.Read())
+            try
             {
-                returnIds.Add($"{sqlReader[0]}");
+                var sqlCmd = await CreateCommandAsync($"SELECT root_path FROM section_locations WHERE available = 1");
+                var sqlReader = await sqlCmd.ExecuteReaderAsync();
+
+                while (sqlReader.Read())
+                {
+                    returnPaths.Add($"{sqlReader[0]}");
+                }
+
+                await DisposeCommandAsync(sqlCmd);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not retrieve library locations: {ex}");
             }
 
-            await DisposeCommandAsync(sqlCmd);
+            return returnPaths;
+        }
+
+        public async Task<List<string>> GetMediaItemIdsAsync(string fileName)
+        {
+            List<string> returnIds = new List<string>();
+
+            try
+            {
+                var sqlCmd = await CreateCommandAsync($"SELECT media_item_id FROM media_parts WHERE file LIKE \"{fileName}\"");
+                var sqlReader = await sqlCmd.ExecuteReaderAsync();
+
+                while (sqlReader.Read())
+                {
+                    returnIds.Add($"{sqlReader[0]}");
+                }
+
+                await DisposeCommandAsync(sqlCmd);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not find matching media item: {ex}");
+            }
 
             return returnIds;
         }
 
-        public async Task<List<string>> GetMetaDataItemIdAsync(string mediaItemId)
+        public async Task<List<string>> GetMetaDataItemIdsAsync(string mediaItemId)
         {
             if (mediaItemId == null) return null;
 
             List<string> returnIds = new List<string>();
-            var sqlCmd = await CreateCommandAsync($"SELECT metadata_item_id FROM media_items WHERE id = {mediaItemId}");
-            var sqlReader = await sqlCmd.ExecuteReaderAsync();
 
-            while (sqlReader.Read())
+            try
             {
-                returnIds.Add($"{sqlReader[0]}");
-                break;
-            }
+                var sqlCmd = await CreateCommandAsync($"SELECT metadata_item_id FROM media_items WHERE id = {mediaItemId}");
+                var sqlReader = await sqlCmd.ExecuteReaderAsync();
 
-            await DisposeCommandAsync(sqlCmd);
+                while (sqlReader.Read())
+                {
+                    returnIds.Add($"{sqlReader[0]}");
+                }
+
+                await DisposeCommandAsync(sqlCmd);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Could not find matching meta data Id: {ex}");
+            }
 
             return returnIds;
         }
@@ -73,18 +112,26 @@ namespace PlexDateAddedUpdater.PlexDB
         public async Task<DateTime?> GetDateAddedByMetaDataItemIdAsync(string metaDataItemId)
         {
             DateTime? returnDT = null;
-            var sqlCmd = await CreateCommandAsync($"SELECT added_at FROM metadata_items WHERE id = {metaDataItemId}");
-            var sqlReader = await sqlCmd.ExecuteReaderAsync();
 
-            while (sqlReader.Read())
+            try
             {
-                if (int.TryParse($"{sqlReader[0]}", out int result))
-                {
-                    returnDT = DateTimeHelpers.FromEpoch(result);
-                }
-            }
+                var sqlCmd = await CreateCommandAsync($"SELECT added_at FROM metadata_items WHERE id = {metaDataItemId}");
+                var sqlReader = await sqlCmd.ExecuteReaderAsync();
 
-            await DisposeCommandAsync(sqlCmd);
+                while (sqlReader.Read())
+                {
+                    if (int.TryParse($"{sqlReader[0]}", out int result))
+                    {
+                        returnDT = DateTimeHelpers.FromEpoch(result);
+                    }
+                }
+
+                await DisposeCommandAsync(sqlCmd);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Could not get date added value: {ex}");
+            }
 
             return returnDT;
         }
@@ -92,49 +139,72 @@ namespace PlexDateAddedUpdater.PlexDB
         public async Task<bool> UpdateDateAddedByMetaDataIdAsync(string mediaItemId, string metaDataItemId, string newDateAdded)
         {
             bool returnData = false;
-            var sqlCmd = await CreateCommandAsync($"UPDATE metadata_items SET added_at = {newDateAdded}, created_at = {newDateAdded}, updated_at = {newDateAdded}, refreshed_at = {newDateAdded} WHERE id = {metaDataItemId}");
-            var updateCount = await sqlCmd.ExecuteNonQueryAsync();
 
-            if (updateCount > 0)
+            try
             {
-                returnData = true;
-            }
+                var sqlCmd = await CreateCommandAsync($"UPDATE metadata_items SET added_at = {newDateAdded}, created_at = {newDateAdded}, updated_at = {newDateAdded}, refreshed_at = {newDateAdded} WHERE id = {metaDataItemId}");
+                var updateCount = await sqlCmd.ExecuteNonQueryAsync();
 
-            sqlCmd.CommandText = $"UPDATE media_parts SET created_at = {newDateAdded}, updated_at = {newDateAdded} WHERE media_item_id = {mediaItemId}";
-            updateCount = await sqlCmd.ExecuteNonQueryAsync();
+                if (updateCount > 0)
+                {
+                    returnData = true;
+                }
+
+                sqlCmd.CommandText = $"UPDATE media_parts SET created_at = {newDateAdded}, updated_at = {newDateAdded} WHERE media_item_id = {mediaItemId}";
+                updateCount = await sqlCmd.ExecuteNonQueryAsync();
+
+                if (updateCount > 0)
+                {
+                    returnData = true;
+                }
+
+                sqlCmd.CommandText = $"UPDATE media_items SET created_at = {newDateAdded}, updated_at = {newDateAdded} WHERE id = {mediaItemId}";
+                updateCount = await sqlCmd.ExecuteNonQueryAsync();
+
+                if (updateCount > 0)
+                {
+                    returnData = true;
+                }
+
+                await DisposeCommandAsync(sqlCmd);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Could not update date added values: {ex}");
+            }
             
-            if (updateCount > 0)
-            {
-                returnData = true;
-            }
-
-            sqlCmd.CommandText = $"UPDATE media_items SET created_at = {newDateAdded}, updated_at = {newDateAdded} WHERE id = {mediaItemId}";
-            updateCount = await sqlCmd.ExecuteNonQueryAsync();
-
-            if (updateCount > 0)
-            {
-                returnData = true;
-            }
-
-            await DisposeCommandAsync(sqlCmd);
-
             return returnData;
         }
 
         private async Task<SqliteCommand> CreateCommandAsync(string sqlCommand)
         {
-            await sqlConn.OpenAsync();
-            var sqlCmd = sqlConn.CreateCommand();
+            try
+            {
+                await sqlConn.OpenAsync();
+                var sqlCmd = sqlConn.CreateCommand();
 
-            sqlCmd.CommandText = sqlCommand;
+                sqlCmd.CommandText = sqlCommand;
 
-            return sqlCmd;
+                return sqlCmd;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not create SQL Command: {ex}");
+            }
+            return null;
         }
 
         private async Task DisposeCommandAsync(SqliteCommand sqlCmd)
         {
-            await sqlCmd.DisposeAsync();
-            await sqlConn.CloseAsync();
+            try
+            {
+                await sqlCmd.DisposeAsync();
+                await sqlConn.CloseAsync();
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Could not dispose SQL command: {ex}");
+            }
         }
 
         public async Task<bool> CheckTriggers()
@@ -162,7 +232,7 @@ namespace PlexDateAddedUpdater.PlexDB
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to disable triggers: {ex.Message}");
+                Console.WriteLine($"Failed to disable triggers: {ex}");
             }
             return false;
         }
@@ -182,7 +252,7 @@ namespace PlexDateAddedUpdater.PlexDB
             }
             catch(Exception ex)
             {
-                Console.WriteLine($"Failed to disable triggers: {ex.Message}");
+                Console.WriteLine($"Failed to disable triggers: {ex}");
             }
             return false;
         }
@@ -202,7 +272,7 @@ namespace PlexDateAddedUpdater.PlexDB
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to enable triggers: {ex.Message}");
+                Console.WriteLine($"Failed to enable triggers: {ex}");
             }
             return false;
         }
