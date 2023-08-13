@@ -1,4 +1,4 @@
-# Plex Media Date Added Updater
+# Plex Media "Date Added" Updater
 
 This is a simple CLI app written in C# to automate updating the date added date for media items in your Plex Media Server Library.
 Not happy with the arrangement of your "Recently Added" media items? Use this tool to correct their dates to those of the file creation dates.
