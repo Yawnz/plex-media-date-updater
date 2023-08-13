@@ -7,7 +7,7 @@ The CLI requires 2 inputs:
 - The path to your Plex Library DB (will default to your default Plex data directory if left blank).
 - The path to the directory where your media items are located (will scan all your library folders if left blank).
 
-**Please scan your library files again after running the tool to ensure the changes reflect correctly**
+### Please scan your library files again after running the tool to ensure the changes reflect correctly.
 
 You can download the latest release if you simply want to use the CLI.
 You can download and compile the source code if you want to make the CLI suit your needs.
